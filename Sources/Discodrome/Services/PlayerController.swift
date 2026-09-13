@@ -236,10 +236,13 @@ final class PlayerController {
         }
     }
 
+    /// Snapshot walkthroughs play real songs: they mustn't end up in the server's listening history.
+    private static let scrobblingAllowed = ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS"] == nil
+
     private func updateScrobbling() {
         scrobbleTimer?.invalidate()
         scrobbleTimer = nil
-        guard settings.scrobble, state.status == .playing, let item = state.currentItem,
+        guard settings.scrobble, Self.scrobblingAllowed, state.status == .playing, let item = state.currentItem,
               item.track.isServerTrack, let client else { return }
         if announcedItem != item.id {
             announcedItem = item.id

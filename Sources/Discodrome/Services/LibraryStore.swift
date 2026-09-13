@@ -95,6 +95,11 @@ final class LibraryStore {
         albums.filter { $0.created != nil }.sorted { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }
     }
 
+    /// For pictures meant for the public, whose playlist names are personal. Until the next sync.
+    func hidePlaylists() {
+        playlists = []
+    }
+
     func configure(_ credentials: ServerCredentials?) {
         refreshTask?.cancel()
         playlistCache = [:]

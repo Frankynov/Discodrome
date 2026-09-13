@@ -6,6 +6,14 @@ storage along the bottom. It is also a gapless music player for the Mac.
 
 Built with SwiftUI and AppKit, no dependencies, and no Xcode required to build it.
 
+![Discodrome: recently added albums, a song playing with its details, and the SNOWSKY DISC's storage along the bottom](docs/screenshots/recently-added.png)
+
+<p>
+  <img src="docs/screenshots/album.png" width="49%" alt="An album that is on the DISC, every song ticked">
+  <img src="docs/screenshots/device.png" width="49%" alt="The DISC's own songs, with their formats and where they are on the card">
+</p>
+<p align="center"><em>Songs already on the DISC are recognised, down to each track, and the card's contents are one click away.</em></p>
+
 ## Requirements
 
 - macOS 15 (Sequoia) or later.
@@ -40,6 +48,9 @@ ask again after you rebuild.
 ## What it does
 
 ### Library
+
+![The albums in light appearance, with the Up Next queue](docs/screenshots/albums-light.png)
+
 Albums, artists, songs and playlists from the server, with cover art, search, sortable song
 columns (right-click a column header to choose columns), and drag and drop. Drop songs on a
 playlist in the sidebar to add them to it on the server.
@@ -148,7 +159,7 @@ DISCODROME_FAKE_DEVICE=/tmp/fake-disc DISCODROME_DATA_DIR=/tmp/discodrome-data \
 | `DISCODROME_FAKE_DEVICE_CAPACITY_MB=120` | gives that fake card a small capacity, so its usage shows in the bar |
 | `DISCODROME_DATA_DIR=/folder` | keeps the library cache, downloads and card manifests out of `~/Library` |
 | `DISCODROME_MUTE=1` | plays silently, without changing the saved volume |
-| `DISCODROME_SNAPSHOTS=/folder` | walks through the app — albums, an album, playback and lyrics, a track change, the device, a copy, deleting and copying back — logging what it sees and saving a PNG of the window at each step (`DISCODROME_SNAPSHOTS_QUIT=1` quits afterwards; `DISCODROME_SNAPSHOTS_ONLY=stream` instead times songs that are still downloading — how soon they start, the change to the next song, underruns — best against `mock_navidrome.py --throttle-kbs`, with `DISCODROME_STREAM_NATURAL=1` to play on into the next song rather than seek; `DISCODROME_SNAPSHOTS_ONLY=inspector` traces the toolbar while the inspector opens and closes, and counts the display refreshes those animations miss) |
+| `DISCODROME_SNAPSHOTS=/folder` | walks through the app — albums, an album, playback and lyrics, a track change, the device, a copy, deleting and copying back — logging what it sees and saving a PNG of the window at each step (`DISCODROME_SNAPSHOTS_QUIT=1` quits afterwards; `DISCODROME_SNAPSHOTS_ONLY=stream` instead times songs that are still downloading — how soon they start, the change to the next song, underruns — best against `mock_navidrome.py --throttle-kbs`, with `DISCODROME_STREAM_NATURAL=1` to play on into the next song rather than seek; `DISCODROME_SNAPSHOTS_ONLY=inspector` traces the toolbar while the inspector opens and closes, and counts the display refreshes those animations miss; `DISCODROME_SNAPSHOTS_ONLY=readme` takes the README's pictures against the server the app is set up with, without scrobbling and with the playlists left out) |
 
 `python3 Tools/mock_navidrome.py … --throttle-kbs 1500` slows song downloads, to watch copy
 progress. Settings are read from the app's bundle identifier, so a development copy with a

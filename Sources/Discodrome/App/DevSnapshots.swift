@@ -47,6 +47,10 @@ enum DevSnapshots {
 
         await waitUntil(60) { !model.library.albums.isEmpty && !model.library.isSyncing }
         log("library: \(model.library.albums.count) albums, \(model.library.tracks.count) songs")
+        if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "readme" {
+            await readme(model, directory: directory)
+            return
+        }
         if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "stream" {
             await streamCheck(model, directory: directory)
             return
@@ -400,6 +404,77 @@ enum DevSnapshots {
 
     private static func descendants(of view: NSView) -> [NSView] {
         view.subviews + view.subviews.flatMap { descendants(of: $0) }
+    }
+
+    /// Pictures for the README, against whichever server the app is set up with: the newest albums
+    /// with one playing, that album, the connected device, and the albums in light appearance. With a
+    /// device connected, the album is the newest one it holds in full; `DISCODROME_README_ALBUM` picks
+    /// another by name. It only looks: nothing is copied or deleted, nothing is scrobbled, the
+    /// playlists' personal names stay out of the pictures, and the window gets its own size back.
+    private static func readme(_ model: AppModel, directory: URL) async {
+        let library = model.library
+        let devices = model.devices
+        guard let window = mainWindow else { return }
+        let device = devices.primaryDevice
+        func isOnDevice(_ album: Album) -> Bool {
+            if case (.complete, _, _)? = AlbumDevicePresence.of(album, library: library, devices: devices) { return true }
+            return false
+        }
+        if let device {
+            // Scanning waits on macOS asking, for a new build, whether the app may read the card.
+            await waitUntil(90) { devices.contents[device.id]?.hasScanned == true }
+            await waitUntil(15) { library.recentlyAdded.contains(where: isOnDevice) }
+            log("device: \(device.name), scanned: \(devices.contents[device.id]?.hasScanned == true), \(devices.contents[device.id]?.files.count ?? 0) files")
+        }
+        // Started from a script, the app is brought to the front from outside: wait, for pictures of an
+        // active window.
+        await waitUntil(20) { window.isKeyWindow }
+
+        let onDevice = library.recentlyAdded.filter(isOnDevice)
+        log("newest albums on the device: " + onDevice.prefix(8).map { "\($0.name) — \($0.artist)" }.joined(separator: " | "))
+        let wanted = ProcessInfo.processInfo.environment["DISCODROME_README_ALBUM"]
+        guard let album = wanted.flatMap({ name in library.albums.first { $0.name.localizedCaseInsensitiveContains(name) } })
+                ?? onDevice.first ?? library.recentlyAdded.first ?? library.albums.first else { return }
+        log("featured: \(album.name) — \(album.artist); window is key: \(window.isKeyWindow)")
+        library.hidePlaylists()
+
+        let original = window.frame
+        var frame = original
+        frame.size = NSSize(width: 1320, height: 840)
+        frame.origin.y = original.maxY - frame.height
+        window.setFrame(frame, display: true)
+
+        model.showInspector = true
+        model.play(album)
+        // Up Next first, so its covers have arrived by the time it's pictured.
+        model.inspectorTab = .upNext
+        model.sidebarSelection = .recentlyAdded
+        await pause(6)
+        model.inspectorTab = .info
+        await pause(2)
+        save("readme-1-recently-added", to: directory)
+
+        model.navigationPath = NavigationPath([album])
+        await pause(3)
+        save("readme-2-album", to: directory)
+        model.navigationPath = NavigationPath()
+
+        if let device {
+            model.deviceShowsTransfers = false
+            model.sidebarSelection = .device(device.id)
+            await pause(3)
+            save("readme-4-device", to: directory)
+        }
+
+        model.sidebarSelection = .albums
+        model.inspectorTab = .upNext
+        NSApp.appearance = NSAppearance(named: .aqua)
+        await pause(4)
+        save("readme-5-albums-light", to: directory)
+        NSApp.appearance = nil
+        model.inspectorTab = .info
+        window.setFrame(original, display: true)
+        log("window back to \(Int(original.width))×\(Int(original.height)); was key: \(window.isKeyWindow)")
     }
 
     private static func scrollViews(in view: NSView?) -> [NSScrollView] {
