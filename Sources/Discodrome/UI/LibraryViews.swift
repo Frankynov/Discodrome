@@ -372,7 +372,9 @@ struct ArtistsView: View {
     @ViewState private var selection: Artist.ID?
 
     var body: some View {
-        HSplitView {
+        // Not HSplitView: an AppKit split view lays its panes out from the top of the window, under the
+        // toolbar, where the clipped detail column hides the first artists and the artist's name.
+        HStack(spacing: 0) {
             List(library.artists, selection: $selection) { artist in
                 HStack(spacing: 8) {
                     ArtworkView(coverArtID: artist.coverArtID, pixelSize: 64, cornerRadius: 13)
@@ -386,8 +388,10 @@ struct ArtistsView: View {
                 .draggable(LibraryDragItem(kind: .artist, id: artist.id))
             }
             .listStyle(.plain)
-            // Both panes fill the height; otherwise the split view shrinks to the list's rows.
-            .frame(minWidth: 200, idealWidth: 260, maxWidth: 380, maxHeight: .infinity)
+            .frame(width: 260)
+            .frame(maxHeight: .infinity)
+
+            Divider()
 
             Group {
                 if let artist = library.artists.first(where: { $0.id == selection }) {
@@ -396,7 +400,7 @@ struct ArtistsView: View {
                     ContentUnavailableView("Select an Artist", systemImage: "music.mic")
                 }
             }
-            .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Artists")
