@@ -12,7 +12,7 @@ MODE=${1:-release}
 APP="build/Discodrome.app"
 
 # The single source of truth for the app's version.
-APP_VERSION="1.0"
+APP_VERSION="1.0.1"
 DEPLOYMENT=15.0
 
 rm -rf "$APP"
