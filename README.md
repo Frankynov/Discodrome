@@ -12,6 +12,15 @@ Built with SwiftUI and AppKit, no dependencies, and no Xcode required to build i
 - A **Navidrome** server, or any other Subsonic-compatible server (gonic, Airsonic…).
 - To build: the Swift toolchain from the Command Line Tools (`xcode-select --install`).
 
+## Install
+
+Download `Discodrome-…-universal.zip` from the [latest release](https://github.com/Frankynov/Discodrome/releases/latest)
+— one app for both Apple silicon and Intel Macs — unzip it, and move **Discodrome** to Applications.
+
+The app is ad-hoc signed, not notarized by Apple, so macOS blocks it the first time you open it.
+After that first attempt, go to System Settings ▸ Privacy & Security, click **Open Anyway** next to
+the message about Discodrome, and confirm. From then on it opens normally.
+
 ## Build and run
 
 ```bash
