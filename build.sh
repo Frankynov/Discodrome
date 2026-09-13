@@ -25,15 +25,17 @@ case "$MODE" in
     cp "$(swift build -c debug --show-bin-path)/Discodrome" "$APP/Contents/MacOS/Discodrome"
     ;;
   universal)
-    for triple in "arm64-apple-macosx$DEPLOYMENT" "x86_64-apple-macosx$DEPLOYMENT"; do
-      echo "▸ Compiling (release, $triple)…"
-      swift build -c release --product Discodrome --triple "$triple"
+    # A build folder per architecture: SwiftPM puts every triple's product at the same path, so the
+    # second build would overwrite the first.
+    SLICES=()
+    for arch in arm64 x86_64; do
+      echo "▸ Compiling (release, $arch)…"
+      FOLDER=".build/universal-$arch"
+      swift build -c release --product Discodrome --triple "$arch-apple-macosx$DEPLOYMENT" --scratch-path "$FOLDER"
+      SLICES+=("$(swift build -c release --triple "$arch-apple-macosx$DEPLOYMENT" --scratch-path "$FOLDER" --show-bin-path)/Discodrome")
     done
     echo "▸ Joining into a universal binary…"
-    lipo -create \
-      "$(swift build -c release --triple "arm64-apple-macosx$DEPLOYMENT" --show-bin-path)/Discodrome" \
-      "$(swift build -c release --triple "x86_64-apple-macosx$DEPLOYMENT" --show-bin-path)/Discodrome" \
-      -output "$APP/Contents/MacOS/Discodrome"
+    lipo -create "${SLICES[@]}" -output "$APP/Contents/MacOS/Discodrome"
     ;;
   *)
     echo "▸ Compiling (release)…"
@@ -41,6 +43,11 @@ case "$MODE" in
     cp "$(swift build -c release --show-bin-path)/Discodrome" "$APP/Contents/MacOS/Discodrome"
     ;;
 esac
+
+if [ "$MODE" != debug ]; then
+  # Drop the debug map: it lists every object file and source folder by its path on this Mac.
+  strip -S "$APP/Contents/MacOS/Discodrome"
+fi
 
 echo "▸ Writing Info.plist…"
 cat > "$APP/Contents/Info.plist" <<PLIST
