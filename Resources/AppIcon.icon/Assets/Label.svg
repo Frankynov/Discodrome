@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="label" gradientUnits="userSpaceOnUse" x1="373.00" y1="373.00" x2="651.00" y2="651.00">
+      <stop offset="0" stop-color="#FF8F47"/>
+      <stop offset="1" stop-color="#ED4054"/>
+    </linearGradient>
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024">
+  <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.25"/>
+  <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.25"/>
+</linearGradient>
+  </defs>
+  <path d="M 373.00 512.00 a 139.00 139.00 0 1 0 278.00 0 a 139.00 139.00 0 1 0 -278.00 0 Z M 487.00 512.00 a 25.00 25.00 0 1 0 50.00 0 a 25.00 25.00 0 1 0 -50.00 0 Z" fill="url(#label)" fill-rule="evenodd"/>
+  <circle cx="512.00" cy="512.00" r="107.00" fill="none" stroke="url(#ring)" stroke-width="2.5"/>
+</svg>

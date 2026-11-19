@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+  <linearGradient id="groove" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024">
+  <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.06"/>
+  <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.06"/>
+</linearGradient>
+  <linearGradient id="faint" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024">
+  <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.03"/>
+  <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.03"/>
+</linearGradient>
+  <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024">
+  <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+  <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.16"/>
+</linearGradient>
+  </defs>
+  <g fill="none" stroke-width="2.5">
+  <circle cx="512.00" cy="512.00" r="164.00" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="172.70" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="181.40" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="190.10" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="198.80" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="207.50" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="216.20" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="224.90" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="233.60" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="242.30" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="251.00" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="259.70" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="268.40" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="277.10" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="285.80" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="294.50" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="303.20" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="311.90" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="320.60" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="329.30" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="338.00" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="346.70" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="355.40" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="364.10" stroke="url(#faint)"/>
+<circle cx="512.00" cy="512.00" r="372.80" stroke="url(#groove)"/>
+<circle cx="512.00" cy="512.00" r="381.50" stroke="url(#groove)"/>
+  </g>
+    <linearGradient id="sheen0" gradientUnits="userSpaceOnUse" x1="831.56" y1="279.82" x2="536.80" y2="117.78">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+    <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.2"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <path d="M 512.00 512.00 L 831.56 279.82 A 395.00 395.00 0 0 0 536.80 117.78 Z" fill="url(#sheen0)"/>
+  <linearGradient id="sheen1" gradientUnits="userSpaceOnUse" x1="192.44" y1="744.18" x2="487.20" y2="906.22">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+    <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.2"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <path d="M 512.00 512.00 L 192.44 744.18 A 395.00 395.00 0 0 0 487.20 906.22 Z" fill="url(#sheen1)"/>
+
+  <circle cx="512.00" cy="512.00" r="393.00" fill="none" stroke="url(#rim)" stroke-width="4"/>
+</svg>

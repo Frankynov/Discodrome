@@ -47,6 +47,7 @@ enum DevSnapshots {
 
         await waitUntil(60) { !model.library.albums.isEmpty && !model.library.isSyncing }
         log("library: \(model.library.albums.count) albums, \(model.library.tracks.count) songs")
+        log("locale: \(Locale.current.identifier), a date reads “\(Date(timeIntervalSince1970: 1_789_000_000).formatted(date: .abbreviated, time: .omitted))”")
         if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "readme" {
             await readme(model, directory: directory)
             return
@@ -78,6 +79,14 @@ enum DevSnapshots {
                 await pause(2.5)
                 save("layout-3-device", to: directory)
             }
+            return
+        }
+        if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "bottoms" {
+            await bottomsCheck(model, directory: directory)
+            return
+        }
+        if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "features" {
+            await featuresCheck(model, directory: directory)
             return
         }
         if ProcessInfo.processInfo.environment["DISCODROME_SNAPSHOTS_ONLY"] == "chrome" {
@@ -476,6 +485,129 @@ enum DevSnapshots {
         window.setFrame(original, display: true)
         log("window back to \(Int(original.width))×\(Int(original.height)); was key: \(window.isKeyWindow)")
     }
+
+    /// Long lists must end above the device bar, not under it: each page in a short window, every list
+    /// scrolled to its end, with where its scroll view and its last row stop, in points from the
+    /// window's bottom edge (the bar is about 57 pt tall).
+    private static func bottomsCheck(_ model: AppModel, directory: URL) async {
+        guard let window = mainWindow else { return }
+        let original = window.frame
+        var short = original
+        short.size.height = 520
+        short.origin.y = original.maxY - short.height
+        window.setFrame(short, display: true)
+        let album = model.library.albums.first { $0.name == "Northbound" } ?? model.library.albums.first
+        var pages: [(String, () -> Void)] = [
+            ("songs", { model.navigationPath = NavigationPath(); model.sidebarSelection = .songs }),
+            ("albums", { model.navigationPath = NavigationPath(); model.sidebarSelection = .albums }),
+        ]
+        if let album {
+            pages.append(("album", { model.sidebarSelection = .albums; model.navigationPath = NavigationPath([album]) }))
+        }
+        if let device = model.devices.primaryDevice {
+            pages.insert(("device", { model.navigationPath = NavigationPath(); model.sidebarSelection = .device(device.id); model.deviceShowsTransfers = false }), at: 0)
+        }
+        for (name, show) in pages {
+            show()
+            await pause(2)
+            for _ in 0..<3 {
+                for scrollView in scrollViews(in: window.contentView) {
+                    guard let document = scrollView.documentView else { continue }
+                    let clip = scrollView.contentView
+                    let end = max(0, document.frame.height - clip.bounds.height + scrollView.contentInsets.bottom)
+                    clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: document.isFlipped ? end - scrollView.contentInsets.top : 0))
+                    scrollView.reflectScrolledClipView(clip)
+                }
+                await pause(0.4)
+            }
+            let report = scrollViews(in: window.contentView).filter { $0.frame.height > 60 && $0.frame.width > 150 }.map { scrollView -> String in
+                let frame = scrollView.convert(scrollView.bounds, to: nil)
+                var line = String(format: "%@ from %.0f, inset %.0f", scrollView.documentView is NSTableView ? "table" : "scroll", frame.minY, scrollView.contentInsets.bottom)
+                if let table = scrollView.documentView as? NSTableView, table.numberOfRows > 0 {
+                    let row = table.convert(table.rect(ofRow: table.numberOfRows - 1), to: nil)
+                    line += String(format: ", last row ends at %.0f", row.minY)
+                }
+                return line
+            }
+            log("\(name): " + report.joined(separator: " | "))
+            save("bottom-\(name)", to: directory)
+        }
+        model.navigationPath = NavigationPath()
+        window.setFrame(original, display: true)
+    }
+
+    /// The device filter on the album and song pages, then a copy: the Dock icon's progress bar while
+    /// it runs, gone afterwards, and the notification it ends with (logged, not posted).
+    private static func featuresCheck(_ model: AppModel, directory: URL) async {
+        let devices = model.devices
+        guard let device = devices.primaryDevice else { return }
+        await waitUntil(15) { devices.contents[device.id]?.hasScanned == true }
+        model.sidebarSelection = .albums
+        for filter in DeviceFilter.allCases {
+            model.deviceFilter = filter
+            await pause(1.5)
+            let shown = filter.albums(model.library.albums, library: model.library, devices: devices)
+            log("albums, \(filter.label(isDISC: true)): \(shown.map(\.name).joined(separator: ", "))")
+            save("filter-albums-\(filter.rawValue)", to: directory)
+        }
+        model.sidebarSelection = .songs
+        model.deviceFilter = .notOnDevice
+        await pause(1.5)
+        log("songs, not on DISC: \(DeviceFilter.notOnDevice.tracks(model.library.tracks, devices: devices).count) of \(model.library.tracks.count)")
+        save("filter-songs-not-on-device", to: directory)
+
+        // A copy from the device's page, with the Dock tile sampled while it runs.
+        model.deviceFilter = .all
+        guard let album = model.library.albums.first(where: { $0.name == "Afterglow" }) else { return }
+        model.sidebarSelection = .device(device.id)
+        model.deviceShowsTransfers = false
+        await pause(1.5)
+        model.copy(album, to: device)
+        await waitUntil(5) { model.transfers.isActive }
+        var fractions: [Int] = []
+        var pictured = false
+        while model.transfers.isActive {
+            if let tile = NSApp.dockTile.contentView {
+                let percent = Int((model.transfers.progress.fraction * 100).rounded())
+                if fractions.last != percent { fractions.append(percent) }
+                if !pictured, percent >= 40, let rep = tile.bitmapImageRepForCachingDisplay(in: tile.bounds) {
+                    tile.cacheDisplay(in: tile.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: directory.appending(path: "dock-tile.png"))
+                    pictured = true
+                    save("copying", to: directory)
+                    if let window = mainWindow, let table = scrollViews(in: window.contentView)
+                        .compactMap({ $0.documentView as? NSTableView }).max(by: { $0.numberOfRows < $1.numberOfRows }) {
+                        table.selectAll(nil)
+                        let incoming = model.transfers.jobs.filter { !$0.isFinished }.count
+                        log("while copying: \(table.numberOfRows) rows, \(incoming) still coming; Select All selected \(table.selectedRowIndexes.count)")
+                        table.deselectAll(nil)
+                    }
+                }
+            }
+            await pause(0.25)
+        }
+        await pause(1)
+        save("after-copy", to: directory)
+        log("dock progress seen at: \(fractions.map { "\($0)%" }.joined(separator: " ")); bar after the copy: \(NSApp.dockTile.contentView == nil ? "gone" : "STILL THERE")")
+        // The progress circle up close, waiting and at a few points, at 4× (one row's status cell each).
+        let strip = NSView(frame: NSRect(x: 0, y: 0, width: 22 * 5, height: 22))
+        strip.appearance = window(for: model)?.effectiveAppearance
+        for (index, fraction) in [nil, 0.0, 0.3, 0.7, 1.0].enumerated() {
+            let circle = CopyProgressCircle(frame: NSRect(x: 22 * index, y: 0, width: 22, height: 22))
+            circle.fraction = fraction
+            strip.addSubview(circle)
+        }
+        if let rep = strip.bitmapImageRepForCachingDisplay(in: strip.bounds) {
+            strip.cacheDisplay(in: strip.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: directory.appending(path: "circles.png"))
+        }
+        model.showTransfers(on: device.id)
+        await pause(1.5)
+        log("after showTransfers: page \(model.sidebarSelection == .device(device.id) ? "device" : "other"), transfers tab \(model.deviceShowsTransfers)")
+        save("transfers", to: directory)
+    }
+
+    private static func window(for model: AppModel) -> NSWindow? { mainWindow }
 
     private static func scrollViews(in view: NSView?) -> [NSScrollView] {
         guard let view else { return [] }

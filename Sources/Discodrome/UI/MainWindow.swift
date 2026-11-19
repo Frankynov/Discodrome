@@ -12,6 +12,17 @@ struct MainWindow: View {
     @ViewState private var widths = ColumnWidths()
 
     var body: some View {
+        // Window-wide, under the sidebar, content and inspector — like iTunes' capacity bar. Below the
+        // split view rather than a safe-area inset of it: an inset doesn't reach the AppKit tables in
+        // the columns, whose last rows then scrolled under the bar. Outside the navigation stack, it
+        // also stays visible on pages pushed onto it.
+        VStack(spacing: 0) {
+            splitView
+            DeviceBar()
+        }
+    }
+
+    @ViewBuilder private var splitView: some View {
         @Bindable var model = model
         NavigationSplitView {
             SidebarView()
@@ -74,13 +85,10 @@ struct MainWindow: View {
         } message: {
             Text(devices.lastError ?? "")
         }
-        // Window-wide, under the sidebar, content and inspector — like iTunes' capacity bar. As an
-        // inset of the split view itself it also stays visible on pages pushed onto the stack.
         // No toolbar background. On macOS 26 the content column's toolbar band starts a couple of
         // points inside the sidebar, because content extends under it — a visibly misaligned edge
         // and line. Without the band the column dividers run cleanly to the top of the window.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .safeAreaInset(edge: .bottom, spacing: 0) { DeviceBar() }
         .onAppear { model.openSettingsWindow = { openSettings() } }
     }
 

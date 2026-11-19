@@ -83,6 +83,9 @@ Plug the DISC in over USB; it mounts as a memory card and appears under **Device
   (✓ in song lists and on album covers). Discodrome recognises songs it copied itself, byte-for-byte
   identical files, and — marked as “probably on the device” — songs with the same tags copied some
   other way. Those are skipped when you copy.
+- **What's still to copy.** While the DISC is connected, the album and song pages offer **All · On
+  DISC · Not on DISC** (also View ▸ Show). An album counts as on the DISC once every song of it is;
+  one only partly copied is listed under Not on DISC.
 - **Folders are the interface.** The DISC has no playlists, so songs are organised as
   `Music/Album Artist/Album/01 Title.flac`, with names made safe for FAT/exFAT. The layout is
   configurable in Settings ▸ Device.
@@ -94,9 +97,14 @@ Plug the DISC in over USB; it mounts as a memory card and appears under **Device
   exFAT can only store as `._` files — and the DISC lists those as broken songs. Discodrome deletes
   them as soon as each song, lyrics file and folder is written, and removes ones left by Finder on
   eject (optional).
+- **Copies show up right away** in the device's song list, as Finder shows them: grey until written,
+  with a circle that fills beside the song being copied.
 - Delete songs from the card with ⌫ in the device's song list.
 - **Transfers** on the device's page lists every copy made this session — one section per album or
   selection — with what was copied, what was skipped and what failed.
+- **Copy in the background.** The Dock icon shows the copy's progress, and when it ends while
+  Discodrome isn't in front a notification says what was copied; click it for the Transfers list.
+  macOS asks once, at the first copy, whether Discodrome may send notifications.
 - The drawing of the DISC shows the cover of what's playing on its round screen, turning slowly
   while it plays, like the player's own display; a ring of light circles it while songs are copied.
 
@@ -159,7 +167,7 @@ DISCODROME_FAKE_DEVICE=/tmp/fake-disc DISCODROME_DATA_DIR=/tmp/discodrome-data \
 | `DISCODROME_FAKE_DEVICE_CAPACITY_MB=120` | gives that fake card a small capacity, so its usage shows in the bar |
 | `DISCODROME_DATA_DIR=/folder` | keeps the library cache, downloads and card manifests out of `~/Library` |
 | `DISCODROME_MUTE=1` | plays silently, without changing the saved volume |
-| `DISCODROME_SNAPSHOTS=/folder` | walks through the app — albums, an album, playback and lyrics, a track change, the device, a copy, deleting and copying back — logging what it sees and saving a PNG of the window at each step (`DISCODROME_SNAPSHOTS_QUIT=1` quits afterwards; `DISCODROME_SNAPSHOTS_ONLY=stream` instead times songs that are still downloading — how soon they start, the change to the next song, underruns — best against `mock_navidrome.py --throttle-kbs`, with `DISCODROME_STREAM_NATURAL=1` to play on into the next song rather than seek; `DISCODROME_SNAPSHOTS_ONLY=inspector` traces the toolbar while the inspector opens and closes, and counts the display refreshes those animations miss; `DISCODROME_SNAPSHOTS_ONLY=readme` takes the README's pictures against the server the app is set up with, without scrobbling and with the playlists left out) |
+| `DISCODROME_SNAPSHOTS=/folder` | walks through the app — albums, an album, playback and lyrics, a track change, the device, a copy, deleting and copying back — logging what it sees and saving a PNG of the window at each step (`DISCODROME_SNAPSHOTS_QUIT=1` quits afterwards; `DISCODROME_SNAPSHOTS_ONLY=stream` instead times songs that are still downloading — how soon they start, the change to the next song, underruns — best against `mock_navidrome.py --throttle-kbs`, with `DISCODROME_STREAM_NATURAL=1` to play on into the next song rather than seek; `DISCODROME_SNAPSHOTS_ONLY=inspector` traces the toolbar while the inspector opens and closes, and counts the display refreshes those animations miss; `DISCODROME_SNAPSHOTS_ONLY=bottoms` scrolls each long list to its end in a short window and logs where it stops against the device bar; `DISCODROME_SNAPSHOTS_ONLY=readme` takes the README's pictures against the server the app is set up with, without scrobbling and with the playlists left out) |
 
 `python3 Tools/mock_navidrome.py … --throttle-kbs 1500` slows song downloads, to watch copy
 progress. Settings are read from the app's bundle identifier, so a development copy with a
@@ -171,4 +179,4 @@ different identifier leaves the real app's preferences alone.
   cache), `Device/` (tag reader, scanner, matcher, path rules), `Model/`.
 - `Sources/Discodrome` — the app: `Services/` (library, player, devices, transfers, settings),
   `UI/`, `App/`.
-- `Tools/` — icon renderer, fixture library, mock server.
+- `Tools/` — the Icon Composer icon's generator, fixture library, mock server.

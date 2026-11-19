@@ -41,6 +41,18 @@ final class TransferManager {
             default: return false
             }
         }
+
+        /// How far along the song is: fetching it from the server is the first half, writing it to the
+        /// card the second — either can be the slow part, over the internet or USB 2.0.
+        /// `nil` while it waits its turn.
+        var fraction: Double? {
+            switch phase {
+            case .waiting: return nil
+            case .downloading(let fraction): return 0.5 * fraction
+            case .writing(let fraction): return 0.5 + 0.5 * fraction
+            case .done, .failed: return 1
+            }
+        }
     }
 
     struct Batch: Identifiable, Sendable {
@@ -85,6 +97,10 @@ final class TransferManager {
     @ObservationIgnored private var worker: Task<Void, Never>?
     /// Index of the first batch the running worker picked up, for its summary.
     @ObservationIgnored private var runStartBatch = 0
+    @ObservationIgnored private let dock = DockProgress()
+    /// Told when the first copy of a run starts, and what the run came to once it ends.
+    @ObservationIgnored var onRunStarted: (() -> Void)?
+    @ObservationIgnored var onRunFinished: ((CopyReport) -> Void)?
 
     init(settings: AppSettings, library: LibraryStore, devices: DeviceManager, player: PlayerController) {
         self.settings = settings
@@ -131,14 +147,7 @@ final class TransferManager {
         let total = batch.count
         let done = batch.filter(\.isFinished).count
         let bytes = batch.reduce(Int64(0)) { $0 + $1.estimatedBytes }
-        let written = batch.reduce(0.0) { sum, job in
-            switch job.phase {
-            case .done, .failed: return sum + Double(job.estimatedBytes)
-            case .writing(let fraction): return sum + Double(job.estimatedBytes) * (0.1 + 0.9 * fraction)
-            case .downloading(let fraction): return sum + Double(job.estimatedBytes) * 0.1 * fraction
-            case .waiting: return sum
-            }
-        }
+        let written = batch.reduce(0.0) { sum, job in sum + Double(job.estimatedBytes) * (job.fraction ?? 0) }
         return (done, total, bytes > 0 ? written / Double(bytes) : 0)
     }
 
@@ -228,7 +237,13 @@ final class TransferManager {
         if worker == nil {
             runStartBatch = batches.count - 1
             worker = Task { await run() }
+            onRunStarted?()
         }
+        updateDock()
+    }
+
+    private func updateDock() {
+        dock.show(isActive ? progress.fraction : nil)
     }
 
     /// "It Goes On — Westside Cowboy", "5 songs by Glass Rivers", "12 songs".
@@ -248,6 +263,7 @@ final class TransferManager {
         for index in jobs.indices where !jobs[index].isFinished {
             jobs[index].phase = .failed("Cancelled")
         }
+        updateDock()
     }
 
     /// Removes the copies that have finished; ones still under way stay.
@@ -268,6 +284,7 @@ final class TransferManager {
     private func setPhase(_ id: UUID, _ phase: Job.Phase) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
         jobs[index].phase = phase
+        updateDock()
     }
 
     private func run() async {
@@ -325,6 +342,17 @@ final class TransferManager {
         if let summary, copied.isEmpty == false { parts.append(summary) }
         summary = parts.isEmpty ? nil : parts.joined(separator: " ")
         for id in Set(runJobs.map(\.deviceID)) { devices.rematch(id) }
+        updateDock()
+
+        let runTitles = batches.dropFirst(runStartBatch).filter { batch in runJobs.contains { $0.batchID == batch.id } }.map(\.title)
+        onRunFinished?(CopyReport(
+            deviceID: runJobs[0].deviceID,
+            deviceName: deviceName,
+            title: runTitles.count == 1 ? runTitles[0] : "\(runTitles.count) copies",
+            copied: copied.count,
+            failed: failed.count,
+            bytes: copied.reduce(0) { $0 + $1.estimatedBytes }
+        ))
     }
 
     private func fetchSource(_ job: Job) -> Task<SourceFile, Error> {
@@ -345,6 +373,7 @@ final class TransferManager {
                     guard let index = self.jobs.firstIndex(where: { $0.id == jobID }),
                           case .downloading = self.jobs[index].phase else { return }
                     self.jobs[index].phase = .downloading(fraction)
+                    self.updateDock()
                 }
             }
             return SourceFile(url: file, isTemporary: true)

@@ -54,10 +54,19 @@ final class AppModel {
     /// Whether the device page shows its Transfers list rather than its songs. Kept here so it
     /// survives navigating away, and so starting a copy can switch to it.
     var deviceShowsTransfers = false
+    /// All / On DISC / Not on DISC on the album and song pages. For this session only: a library that
+    /// opens filtered would look like missing music.
+    var deviceFilter: DeviceFilter = .all
+    /// The filter in effect: none without a device, or before its songs have been recognised.
+    var activeDeviceFilter: DeviceFilter {
+        guard let device = devices.primaryDevice, devices.contents[device.id]?.hasScanned == true else { return .all }
+        return deviceFilter
+    }
     /// Opens the Settings window; set by the main window, which can reach SwiftUI's action.
     @ObservationIgnored var openSettingsWindow: (() -> Void)?
 
     @ObservationIgnored private var lyricsCache: [String: Lyrics] = [:]
+    @ObservationIgnored private var copyNotifier: CopyNotifier?
 
     init() {
         settings = AppSettings()
@@ -66,9 +75,21 @@ final class AppModel {
         devices = DeviceManager(settings: settings, library: library)
         transfers = TransferManager(settings: settings, library: library, devices: devices, player: player)
         applyServerSettings()
+        let notifier = CopyNotifier { [weak self] deviceID in self?.showTransfers(on: deviceID) }
+        copyNotifier = notifier
+        transfers.onRunStarted = { notifier.copyStarted() }
+        transfers.onRunFinished = { notifier.copyFinished($0) }
         devices.start()
         KeyMonitor.install(player: player)
         DevSnapshots.runIfRequested(self)
+    }
+
+    /// Where a "copy finished" notification leads.
+    func showTransfers(on deviceID: String) {
+        guard devices.devices.contains(where: { $0.id == deviceID }) else { return }
+        searchText = ""
+        sidebarSelection = .device(deviceID)
+        deviceShowsTransfers = true
     }
 
     func applyServerSettings() {

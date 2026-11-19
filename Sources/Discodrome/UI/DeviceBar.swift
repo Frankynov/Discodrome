@@ -65,39 +65,59 @@ struct DeviceBar: View {
         .buttonStyle(.plain)
         .help("Show what's on “\(device.name)”")
 
+        // Three zones: the player on the left, its storage as a gauge in the middle — capped, so it
+        // reads as a gauge rather than a rule across a wide window — and what's going on at the right.
+        VStack(alignment: .leading, spacing: 2) {
+            Text(device.name)
+                .font(.system(size: 13, weight: .semibold))
+            Text(device.details)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .lineLimit(1)
+        .frame(maxWidth: 220, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+
+        Spacer(minLength: 20)
+
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(device.name)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(device.details)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 12)
-                status(device, contents)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
             CapacityBar(usage: usage, pending: pending)
-                .frame(height: 11)
+                .frame(height: 13)
             CapacityLegend(usage: usage, pending: pending)
         }
+        .frame(minWidth: 340, maxWidth: 560)
+        .layoutPriority(1)
 
-        if copying {
-            Button {
-                transfers.cancelAll()
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
+        Spacer(minLength: 20)
+
+        status(device, contents)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            // A fixed slot, and one button that is Stop while copying (Eject can't be used then): the
+            // right side keeps its width, so the gauge doesn't shift when a copy starts or ends.
+            .frame(width: 240, alignment: .trailing)
+
+        Group {
+            if copying {
+                Button {
+                    transfers.cancelAll()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .frame(minWidth: 64)
+                }
+                .help("Stop copying")
+            } else {
+                Button {
+                    model.eject(device)
+                } label: {
+                    Label("Eject", systemImage: "eject.fill")
+                        .frame(minWidth: 64)
+                }
+                .help("Eject “\(device.name)” (⌘E)")
             }
-            .help("Stop copying")
         }
-        Button {
-            model.eject(device)
-        } label: {
-            Label("Eject", systemImage: "eject.fill")
-        }
-        .help("Eject “\(device.name)” (⌘E)")
-        .disabled(copying)
     }
 
     @ViewBuilder
@@ -185,9 +205,9 @@ struct CapacityBar: View {
                     }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                RoundedRectangle(cornerRadius: 4.5, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
             }
         }

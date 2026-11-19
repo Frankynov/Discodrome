@@ -27,10 +27,17 @@ struct AlbumGridView: View {
     let albums: [Album]
     let title: String
     @Environment(LibraryStore.self) private var library
+    @Environment(AppModel.self) private var model
+    @Environment(DeviceManager.self) private var devices
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 18, alignment: .top)]
 
     var body: some View {
+        let filter = model.activeDeviceFilter
+        let shown = filter.albums(albums, library: library, devices: devices)
+        let count = filter == .all
+            ? "\(albums.count.formatted()) album\(albums.count == 1 ? "" : "s")"
+            : "\(shown.count.formatted()) of \(albums.count.formatted()) albums"
         Group {
             if albums.isEmpty {
                 if library.isSyncing || library.connection == .connecting {
@@ -41,9 +48,16 @@ struct AlbumGridView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        PageHeader(title: title, subtitle: "\(albums.count.formatted()) album\(albums.count == 1 ? "" : "s")")
+                        HStack(alignment: .center, spacing: 12) {
+                            PageHeader(title: title, subtitle: count)
+                            DeviceFilterPicker()
+                        }
+                        if shown.isEmpty {
+                            DeviceFilterEmptyView(filter: filter, noun: "albums")
+                                .frame(maxWidth: .infinity, minHeight: 280)
+                        }
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
-                            ForEach(albums) { album in
+                            ForEach(shown) { album in
                                 AlbumTile(album: album)
                             }
                         }
@@ -54,7 +68,7 @@ struct AlbumGridView: View {
             }
         }
         .navigationTitle(title)
-        .navigationSubtitle(albums.isEmpty ? "" : "\(albums.count.formatted()) albums")
+        .navigationSubtitle(albums.isEmpty ? "" : count)
     }
 }
 
@@ -266,28 +280,52 @@ struct AlbumDetailView: View {
 
 struct SongsView: View {
     @Environment(LibraryStore.self) private var library
+    @Environment(AppModel.self) private var model
+    @Environment(DeviceManager.self) private var devices
 
     var body: some View {
+        let filter = model.activeDeviceFilter
+        let shown = filter.tracks(library.tracks, devices: devices)
+        let count = library.tracks.isEmpty ? "" : filter == .all
+            ? "\(library.tracks.count.formatted()) songs"
+            : "\(shown.count.formatted()) of \(library.tracks.count.formatted()) songs"
         VStack(spacing: 0) {
-            PageHeader(title: "Songs", subtitle: library.tracks.isEmpty ? nil : "\(library.tracks.count.formatted()) songs")
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 12)
+            HStack(alignment: .center, spacing: 12) {
+                PageHeader(title: "Songs", subtitle: count.isEmpty ? nil : count)
+                DeviceFilterPicker()
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
             Divider()
             TrackTable(
-                tracks: library.tracks,
-                version: library.revision,
+                tracks: shown,
+                version: tableVersion(filter),
                 style: .init(visibleColumns: [.status, .title, .artist, .album, .time, .format, .year, .genre], autosaveName: "AllSongs")
             )
             .overlay {
                 if library.tracks.isEmpty {
                     if library.isSyncing { ProgressView(library.syncProgress ?? "Loading…") }
                     else { ContentUnavailableView("No Songs", systemImage: "music.note") }
+                } else if shown.isEmpty {
+                    DeviceFilterEmptyView(filter: filter, noun: "songs")
                 }
             }
         }
         .navigationTitle("Songs")
-        .navigationSubtitle(library.tracks.isEmpty ? "" : "\(library.tracks.count.formatted()) songs")
+        .navigationSubtitle(count)
+    }
+
+    /// The table reloads when this changes: the library, the filter, and — while filtering — what's on
+    /// the card.
+    private func tableVersion(_ filter: DeviceFilter) -> Int {
+        var hasher = Hasher()
+        hasher.combine(library.revision)
+        hasher.combine(filter)
+        if filter != .all, let device = devices.primaryDevice {
+            hasher.combine(devices.contents[device.id]?.matchRevision)
+        }
+        return hasher.finalize()
     }
 }
 

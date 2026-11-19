@@ -80,6 +80,13 @@ struct DiscodromeCommands: Commands {
             }
             .keyboardShortcut("u", modifiers: [.command, .option])
             Divider()
+            Picker("Show", selection: Binding(get: { model.deviceFilter }, set: { model.deviceFilter = $0 })) {
+                ForEach(DeviceFilter.allCases) { filter in
+                    Text(filter.label(isDISC: model.devices.primaryDevice?.isDISC ?? true)).tag(filter)
+                }
+            }
+            .disabled(model.devices.primaryDevice == nil)
+            Divider()
         }
     }
 }

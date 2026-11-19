@@ -17,11 +17,13 @@ struct DeviceView: View {
                 if model.deviceShowsTransfers && !transfers.jobs.isEmpty {
                     TransferList(deviceID: device.id)
                 } else {
+                    let incoming = incomingSongs(on: device, contents)
                     TrackTable(
-                        tracks: contents?.tracks ?? [],
-                        version: contents?.tracksRevision ?? 0,
+                        tracks: (contents?.tracks ?? []) + incoming.tracks,
+                        version: incoming.version(contents?.tracksRevision ?? 0),
                         style: .init(visibleColumns: [.status, .title, .artist, .album, .time, .format, .size, .location],
-                                     autosaveName: "DeviceTracks", device: device, defaultSort: .artist)
+                                     autosaveName: "DeviceTracks", device: device, defaultSort: .artist),
+                        copying: incoming.progress
                     )
                     .overlay {
                         if let contents, contents.tracks.isEmpty {
@@ -52,9 +54,6 @@ struct DeviceView: View {
             } isTargeted: { isTargeted = $0 }
             .navigationTitle(device.name)
             .navigationSubtitle(contents.map { "\($0.tracks.count.formatted()) songs" } ?? "")
-            .onChange(of: transfers.isActive(on: device.id)) { _, active in
-                if active { model.deviceShowsTransfers = true }
-            }
         } else {
             ContentUnavailableView("Device Disconnected", systemImage: "cable.connector.slash")
         }
@@ -111,6 +110,40 @@ struct DeviceView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
+    }
+
+    /// Songs being copied to the card, shown in its list ahead of time as Finder shows a copy: in grey,
+    /// with a circle that fills as each one is written. Each has the id its file will have, so its row
+    /// turns solid in place once it's there.
+    private func incomingSongs(on device: Device, _ contents: DeviceContents?) -> IncomingSongs {
+        let onCard = Set(contents?.tracks.map(\.id) ?? [])
+        var incoming = IncomingSongs()
+        for job in transfers.jobs where job.deviceID == device.id && !job.isFinished {
+            let id = "device:" + job.relativePath
+            guard !onCard.contains(id), incoming.progress[id] == nil else { continue }
+            var track = job.track
+            track.id = id
+            track.path = job.relativePath
+            track.size = job.estimatedBytes
+            if job.transcode { track.suffix = "mp3" }
+            incoming.tracks.append(track)
+            // Whole steps of 2 %: the table redraws its circles only when they move.
+            incoming.progress[id] = job.fraction.map { ($0 * 50).rounded() / 50 } ?? TrackTable.waiting
+        }
+        return incoming
+    }
+}
+
+struct IncomingSongs {
+    var tracks: [Track] = []
+    var progress: [String: Double] = [:]
+
+    /// The table's version: the card's songs and which songs are on their way.
+    func version(_ tracksRevision: Int) -> Int {
+        var hasher = Hasher()
+        hasher.combine(tracksRevision)
+        hasher.combine(tracks.map(\.id))
+        return hasher.finalize()
     }
 }
 

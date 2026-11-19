@@ -3,7 +3,7 @@
 .swiftpm/
 Package.resolved
 
-# Assembled app bundle and generated icon set
+# Assembled app bundle (and the compiled icon in build/icon)
 build/
 Resources/AppIcon.iconset/
 

@@ -111,6 +111,11 @@ struct TrackTable: NSViewRepresentable {
     /// Changes whenever `tracks` does, so updates can skip comparing arrays.
     var version: Int
     var style: Style
+    /// Songs still being copied, by id: how far along each is, or `waiting`. Their rows are grey, show
+    /// a progress circle and can't be selected, played or dragged until the file is there.
+    var copying: [String: Double] = [:]
+
+    static let waiting = -1.0
 
     @Environment(AppModel.self) private var model
     @Environment(PlayerController.self) private var player
@@ -204,6 +209,7 @@ struct TrackTable: NSViewRepresentable {
         }
         context.coordinator.update(
             parent: self,
+            copying: copying,
             nowPlayingID: player.currentTrack?.id,
             presence: presence,
             presenceRevision: presenceRevision,
@@ -224,6 +230,7 @@ struct TrackTable: NSViewRepresentable {
         private var presence: [String: DevicePresence] = [:]
         private var presenceRevision = Int.min
         private var deviceName: String?
+        private var copying: [String: Double] = [:]
         private var suppressSelectionEvents = false
         private var isFittingColumns = false
 
@@ -247,7 +254,7 @@ struct TrackTable: NSViewRepresentable {
             }
         }
 
-        func update(parent: TrackTable, nowPlayingID: String?, presence: [String: DevicePresence], presenceRevision: Int, deviceName: String?, revealID: String?) {
+        func update(parent: TrackTable, copying: [String: Double], nowPlayingID: String?, presence: [String: DevicePresence], presenceRevision: Int, deviceName: String?, revealID: String?) {
             self.parent = parent
             guard let table else { return }
             if sortColumn == nil, let descriptor = table.sortDescriptors.first, let column = descriptor.key.flatMap(TrackColumn.init(rawValue:)) {
@@ -264,6 +271,11 @@ struct TrackTable: NSViewRepresentable {
             }
             if nowPlayingID != self.nowPlayingID {
                 self.nowPlayingID = nowPlayingID
+                statusChanged = true
+            }
+            // Which songs are copying changes the rows (and the version); only progress, the circles.
+            if copying != self.copying {
+                self.copying = copying
                 statusChanged = true
             }
 
@@ -316,6 +328,7 @@ struct TrackTable: NSViewRepresentable {
         }
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+            guard !isCopying(row) else { return nil }
             guard rows.indices.contains(row) else { return nil }
             let track = rows[row]
             let item = NSPasteboardItem()
@@ -344,7 +357,17 @@ struct TrackTable: NSViewRepresentable {
             let identifier = NSUserInterfaceItemIdentifier("cell." + column.rawValue)
             let cell = (tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTableCellView) ?? Self.makeTextCell(identifier, column)
             cell.textField?.stringValue = column.text(for: track)
+            cell.textField?.textColor = copying[track.id] != nil ? .tertiaryLabelColor
+                : column.isSecondary ? .secondaryLabelColor : .labelColor
             return cell
+        }
+
+        private func isCopying(_ row: Int) -> Bool {
+            rows.indices.contains(row) && copying[rows[row].id] != nil
+        }
+
+        func tableView(_ tableView: NSTableView, selectionIndexesForProposedSelection proposed: IndexSet) -> IndexSet {
+            copying.isEmpty ? proposed : proposed.filteredIndexSet { !isCopying($0) }
         }
 
         private static func makeTextCell(_ identifier: NSUserInterfaceItemIdentifier, _ column: TrackColumn) -> NSTableCellView {
@@ -368,6 +391,16 @@ struct TrackTable: NSViewRepresentable {
         }
 
         private func statusCell(_ tableView: NSTableView, _ track: Track) -> NSView {
+            if let progress = copying[track.id] {
+                let identifier = NSUserInterfaceItemIdentifier("cell.copying")
+                let circle = (tableView.makeView(withIdentifier: identifier, owner: nil) as? CopyProgressCircle) ?? {
+                    let view = CopyProgressCircle()
+                    view.identifier = identifier
+                    return view
+                }()
+                circle.fraction = progress == TrackTable.waiting ? nil : progress
+                return circle
+            }
             let identifier = NSUserInterfaceItemIdentifier("cell.status")
             let imageView = (tableView.makeView(withIdentifier: identifier, owner: nil) as? NSImageView) ?? {
                 let view = NSImageView()
@@ -401,14 +434,16 @@ struct TrackTable: NSViewRepresentable {
 
         @objc func doubleClicked(_ sender: NSTableView) {
             let row = sender.clickedRow
-            guard rows.indices.contains(row) else { return }
-            parent?.model.play(rows, startingAt: row)
+            guard rows.indices.contains(row), !isCopying(row) else { return }
+            let playable = rows.filter { copying[$0.id] == nil }
+            parent?.model.play(playable, startingAt: playable.firstIndex { $0.id == rows[row].id } ?? 0)
         }
 
         func playSelection() {
             guard let table, let first = table.selectedRowIndexes.first else { return }
             if table.selectedRowIndexes.count == 1 {
-                parent?.model.play(rows, startingAt: first)
+                let playable = rows.filter { copying[$0.id] == nil }
+                parent?.model.play(playable, startingAt: playable.firstIndex { $0.id == rows[first].id } ?? 0)
             } else {
                 parent?.model.play(table.selectedRowIndexes.map { rows[$0] })
             }
@@ -424,7 +459,7 @@ struct TrackTable: NSViewRepresentable {
         private func targetRows(_ table: NSTableView) -> [Track] {
             let clicked = table.clickedRow
             if clicked >= 0, !table.selectedRowIndexes.contains(clicked) {
-                return rows.indices.contains(clicked) ? [rows[clicked]] : []
+                return rows.indices.contains(clicked) && !isCopying(clicked) ? [rows[clicked]] : []
             }
             return table.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0] : nil }
         }
@@ -530,4 +565,45 @@ final class ActionMenuItem: NSMenuItem {
     required init(coder: NSCoder) { fatalError("not used") }
 
     @objc private func run() { handler() }
+}
+
+/// A song's copy progress, as Finder draws it beside a file being copied: a ring that fills like a
+/// pie; empty while the song waits its turn.
+final class CopyProgressCircle: NSView {
+    var fraction: Double? {
+        didSet {
+            guard fraction != oldValue else { return }
+            needsDisplay = true
+            setAccessibilityValue(fraction.map { "\(Int(($0 * 100).rounded())) %" } ?? "Waiting")
+        }
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.progressIndicator)
+        setAccessibilityLabel("Copying")
+        toolTip = "Being copied"
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let diameter: CGFloat = 12
+        let ring = NSRect(x: (bounds.width - diameter) / 2, y: (bounds.height - diameter) / 2, width: diameter, height: diameter)
+        let outline = NSBezierPath(ovalIn: ring.insetBy(dx: 0.6, dy: 0.6))
+        outline.lineWidth = 1.2
+        (fraction == nil ? NSColor.tertiaryLabelColor : NSColor.controlAccentColor).setStroke()
+        outline.stroke()
+        guard let fraction, fraction > 0 else { return }
+        let pie = NSBezierPath()
+        let centre = NSPoint(x: ring.midX, y: ring.midY)
+        let radius = diameter / 2 - 2.2
+        pie.move(to: centre)
+        // From twelve o'clock, clockwise.
+        pie.appendArc(withCenter: centre, radius: radius, startAngle: 90, endAngle: 90 - 360 * min(fraction, 1), clockwise: true)
+        pie.close()
+        NSColor.controlAccentColor.setFill()
+        pie.fill()
+    }
 }

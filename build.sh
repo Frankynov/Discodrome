@@ -12,7 +12,7 @@ MODE=${1:-release}
 APP="build/Discodrome.app"
 
 # The single source of truth for the app's version.
-APP_VERSION="1.0.1"
+APP_VERSION="1.0.2"
 DEPLOYMENT=15.0
 
 rm -rf "$APP"
@@ -60,6 +60,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Discodrome</string>
   <key>CFBundleIdentifier</key><string>com.discodrome.app</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
+  <!-- Without a language of its own, the app formats dates in the Mac's first language (French
+       "12 sept. 2026") inside its English interface. -->
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string></array>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
   <key>CFBundleVersion</key><string>$APP_VERSION</string>
@@ -88,6 +93,20 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# The icon is an Icon Composer document (Tools/MakeIconArt.swift writes it). Xcode's actool turns it
+# into the Assets.car that macOS 26 and later light, darken and tint from its layers, and into the
+# .icns for macOS 15 — kept in the repository for builds made without Xcode.
+if xcrun --find actool >/dev/null 2>&1; then
+  echo "▸ Compiling the app icon…"
+  rm -rf build/icon && mkdir -p build/icon
+  xcrun actool --output-format human-readable-text --notices --warnings --app-icon AppIcon \
+    --output-partial-info-plist build/icon/AppIcon.plist --platform macosx \
+    --minimum-deployment-target "$DEPLOYMENT" --compile build/icon Resources/AppIcon.icon > /dev/null
+  cp build/icon/AppIcon.icns Resources/AppIcon.icns
+  cp build/icon/Assets.car "$APP/Contents/Resources/Assets.car"
+else
+  echo "▸ Xcode not selected: using the icon from the last build, without its macOS 26 lighting."
+fi
 if [ -f Resources/AppIcon.icns ]; then
   cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 fi
